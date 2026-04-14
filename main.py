@@ -5,12 +5,14 @@ from threading import Thread
 import time
 import os
 
-# 从环境变量读取密钥（安全！不要硬编码）
+# ========== 机器人配置（从环境变量读取，安全） ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7784613616"))  # 默认值防错
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7784613616"))
 
+# 初始化机器人
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 
+# 全局变量
 forward_map = {}
 processed_ids = set()
 banned_users = set()
@@ -24,10 +26,10 @@ def keep_alive():
     return f"🤖 客服机器人运行中 | 管理员ID: {ADMIN_ID} | 在线用户: {len(all_users)}"
 
 def run_web_server():
-    port = int(os.getenv("PORT", 8080))  # Render指定端口
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False)
 
-# ========== 机器人功能（和你原来的完全一致） ==========
+# ========== 机器人核心功能（完全保留你原来的逻辑，修复语法） ==========
 @bot.message_handler(commands=['start'])
 def start(msg: Message):
     all_users.add(msg.from_user.id)
@@ -83,7 +85,7 @@ def broadcast(msg: Message):
         try:
             bot.send_message(uid, text)
             success += 1
-        except Exception:
+        except Exception as e:
             failed += 1
     bot.send_message(ADMIN_ID, f"📢 群发完成：成功 {success} 人，失败 {failed} 人")
 
@@ -109,6 +111,57 @@ def handle_all(msg: Message):
                 bot.send_message(user_id, msg.text)
             elif msg.photo:
                 bot.send_photo(user_id, msg.photo[-1].file_id, caption=msg.caption)
+            elif msg.video:
+                bot.send_video(user_id, msg.video.file_id, caption=msg.caption)
+            elif msg.document:
+                bot.send_document(user_id, msg.document.file_id, caption=msg.caption)
+            elif msg.sticker:
+                bot.send_sticker(user_id, msg.sticker.file_id)
+            elif msg.voice:
+                bot.send_voice(user_id, msg.voice.file_id, caption=msg.caption)
+            elif msg.video_note:
+                bot.send_video_note(user_id, msg.video_note.file_id)
+            elif msg.audio:
+                bot.send_audio(user_id, msg.audio.file_id, caption=msg.caption)
+            elif msg.animation:
+                bot.send_animation(user_id, msg.animation.file_id, caption=msg.caption)
+            bot.send_message(ADMIN_ID, "✅ 回复已发送给用户")
+        except Exception as e:
+            bot.send_message(ADMIN_ID, f"❌ 发送失败：{str(e)}")
+        return
+
+    all_users.add(msg.from_user.id)
+
+    if msg.from_user.id in banned_users:
+        return
+
+    try:
+        forward_msg = bot.forward_message(ADMIN_ID, msg.chat.id, msg.message_id)
+        forward_map[forward_msg.message_id] = msg.from_user.id
+    except Exception as e:
+        print(f"转发失败：{str(e)}")
+
+# ========== 启动入口（异常自动重启，稳定运行） ==========
+def start_bot():
+    print("✅ 机器人启动成功，等待消息...")
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=20,
+                long_polling_timeout=20,
+                skip_pending=True,
+                none_stop=True,
+                interval=1
+            )
+        except Exception as e:
+            print(f"⚠️ 机器人异常重启: {str(e)}")
+            time.sleep(5)
+
+if __name__ == "__main__":
+    # 启动Flask保活服务（后台运行）
+    Thread(target=run_web_server, daemon=True).start()
+    # 启动机器人
+    start_bot()
             elif msg.video:
                 bot.send_video(user_id, msg.video.file_id, caption=msg.caption)
             elif msg.document:
