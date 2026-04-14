@@ -9,20 +9,19 @@ import requests
 # ========== 机器人配置（从环境变量读取，安全） ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7784613616"))
-# 你的Render域名（固定）
 RENDER_URL = "https://telegram-cs-bot-52ib.onrender.com"
 
 # 初始化机器人
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 
-# 全局变量 + 内存优化（限制最大数量，防止溢出）
+# 全局变量
 forward_map = {}
 processed_ids = set()
 banned_users = set()
 all_users = set()
-MAX_CACHE_SIZE = 500  # 缓存上限
+MAX_CACHE_SIZE = 500
 
-# ========== Flask 保活服务（Render必须） ==========
+# ========== Flask 保活服务 ==========
 app = Flask('TelegramBot')
 
 @app.route('/')
@@ -33,27 +32,24 @@ def run_web_server():
     port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# ========== 新增：Render防休眠保活线程（核心修复） ==========
+# ========== Render防休眠保活 ==========
 def auto_keep_alive():
     while True:
         try:
-            # 每4分钟请求一次自己，骗过Render判定活跃
             requests.get(RENDER_URL, timeout=10)
-            print("✅ 保活请求成功")
         except Exception as e:
-            print(f"⚠️ 保活请求失败: {e}")
-        time.sleep(240)  # 240秒=4分钟
+            pass
+        time.sleep(240)
 
-# ========== 内存优化：定时清理缓存 ==========
+# ========== 定时清理缓存 ==========
 def clean_cache():
     global processed_ids, forward_map
     while True:
-        time.sleep(3600)  # 每小时清理一次
+        time.sleep(3600)
         if len(processed_ids) > MAX_CACHE_SIZE:
             processed_ids = set(list(processed_ids)[-MAX_CACHE_SIZE:])
         if len(forward_map) > MAX_CACHE_SIZE:
             forward_map = dict(list(forward_map.items())[-MAX_CACHE_SIZE:])
-        print("🧹 缓存清理完成")
 
 # ========== 机器人核心功能 ==========
 @bot.message_handler(commands=['start'])
@@ -167,7 +163,7 @@ def handle_all(msg: Message):
     except Exception as e:
         print(f"转发失败：{str(e)}")
 
-# ========== 机器人启动逻辑 ==========
+# ========== 机器人启动 ==========
 def start_bot():
     print("✅ 机器人启动成功，等待消息...")
     while True:
@@ -185,42 +181,7 @@ def start_bot():
 
 # ========== 启动入口 ==========
 if __name__ == "__main__":
-    # 启动Flask
     Thread(target=run_web_server, daemon=True).start()
-    # 启动防休眠保活
     Thread(target=auto_keep_alive, daemon=True).start()
-    # 启动缓存清理
     Thread(target=clean_cache, daemon=True).start()
-    # 启动机器人
-    start_bot()
-            elif msg.audio:
-                bot.send_audio(user_id, msg.audio.file_id, caption=msg.caption)
-            elif msg.animation:
-                bot.send_animation(user_id, msg.animation.file_id, caption=msg.caption)
-            bot.send_message(ADMIN_ID, "✅ 已回复用户")
-        except Exception as e:
-            bot.send_message(ADMIN_ID, f"❌ 发送失败：{str(e)}")
-        return
-
-    all_users.add(msg.from_user.id)
-    if msg.from_user.id in banned_users:
-        return
-
-    try:
-        forward_msg = bot.forward_message(ADMIN_ID, msg.chat.id, msg.message_id)
-        forward_map[forward_msg.message_id] = msg.from_user.id
-    except:
-        pass
-
-def start_bot():
-    print("✅ 机器人启动成功，等待消息...")
-    while True:
-        try:
-            bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True, none_stop=True, interval=1)
-        except Exception as e:
-            print(f"⚠️ 异常重启: {str(e)}")
-            time.sleep(5)
-
-if __name__ == "__main__":
-    Thread(target=run_web_server, daemon=True).start()
     start_bot()
