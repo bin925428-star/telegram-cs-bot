@@ -5,35 +5,32 @@ from threading import Thread
 import time
 import os
 
-# ========== 机器人配置（从环境变量读取，安全） ==========
+# ========== 机器人配置 ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7784613616"))
 
-# 初始化机器人
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
 
-# 全局变量
 forward_map = {}
 processed_ids = set()
 banned_users = set()
 all_users = set()
 
-# ========== Flask 保活服务（Render必须） ==========
+# ========== Flask 保活 ==========
 app = Flask('TelegramBot')
 
 @app.route('/')
 def keep_alive():
-    return f"🤖 客服机器人运行中 | 管理员ID: {ADMIN_ID} | 在线用户: {len(all_users)}"
+    return "🤖 机器人运行中"
 
 def run_web_server():
     port = int(os.getenv("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)
 
-# ========== 机器人核心功能（仅修改/start话术） ==========
+# ========== 欢迎语已修改 ==========
 @bot.message_handler(commands=['start'])
 def start(msg: Message):
     all_users.add(msg.from_user.id)
-    # 已修改为你要求的新话术
     bot.send_message(msg.chat.id, "笔画双向机器人 看见消息会回复")
 
 @bot.message_handler(commands=['ban'])
@@ -45,11 +42,11 @@ def ban_user(msg: Message):
         return
     replied_id = msg.reply_to_message.message_id
     if replied_id not in forward_map:
-        bot.send_message(ADMIN_ID, "⚠️ 无法识别该用户，请回复转发过来的用户消息")
+        bot.send_message(ADMIN_ID, "⚠️ 无法识别该用户")
         return
     user_id = forward_map[replied_id]
     banned_users.add(user_id)
-    bot.send_message(ADMIN_ID, f"🚫 用户 {user_id} 已被拉黑，消息将不再转发")
+    bot.send_message(ADMIN_ID, f"🚫 用户 {user_id} 已拉黑")
 
 @bot.message_handler(commands=['unban'])
 def unban_user(msg: Message):
@@ -60,14 +57,11 @@ def unban_user(msg: Message):
         return
     replied_id = msg.reply_to_message.message_id
     if replied_id not in forward_map:
-        bot.send_message(ADMIN_ID, "⚠️ 无法识别该用户，请回复转发过来的用户消息")
+        bot.send_message(ADMIN_ID, "⚠️ 无法识别该用户")
         return
     user_id = forward_map[replied_id]
-    if user_id in banned_users:
-        banned_users.discard(user_id)
-        bot.send_message(ADMIN_ID, f"✅ 用户 {user_id} 已解除拉黑")
-    else:
-        bot.send_message(ADMIN_ID, f"ℹ️ 用户 {user_id} 不在黑名单中")
+    banned_users.discard(user_id)
+    bot.send_message(ADMIN_ID, f"✅ 用户 {user_id} 已解除拉黑")
 
 @bot.message_handler(commands=['all'])
 def broadcast(msg: Message):
@@ -75,10 +69,7 @@ def broadcast(msg: Message):
         return
     text = msg.text.partition(' ')[2].strip()
     if not text:
-        bot.send_message(ADMIN_ID, "⚠️ 请在 /all 后面加上要发送的内容，例如：/all 我爱你")
-        return
-    if not all_users:
-        bot.send_message(ADMIN_ID, "⚠️ 暂无用户记录，无法群发")
+        bot.send_message(ADMIN_ID, "⚠️ 格式：/all 内容")
         return
     success = 0
     failed = 0
@@ -86,15 +77,11 @@ def broadcast(msg: Message):
         try:
             bot.send_message(uid, text)
             success += 1
-        except Exception as e:
+        except:
             failed += 1
-    bot.send_message(ADMIN_ID, f"📢 群发完成：成功 {success} 人，失败 {failed} 人")
+    bot.send_message(ADMIN_ID, f"📢 群发成功：{success} 失败：{failed}")
 
-@bot.message_handler(func=lambda msg: True, content_types=[
-    'text', 'photo', 'video', 'document', 'sticker',
-    'voice', 'video_note', 'audio', 'animation',
-    'contact', 'location'
-])
+@bot.message_handler(func=lambda msg: True, content_types=['text', 'photo', 'video', 'document', 'sticker', 'voice', 'video_note', 'audio', 'animation', 'contact', 'location'])
 def handle_all(msg: Message):
     if msg.message_id in processed_ids:
         return
@@ -126,48 +113,30 @@ def handle_all(msg: Message):
                 bot.send_audio(user_id, msg.audio.file_id, caption=msg.caption)
             elif msg.animation:
                 bot.send_animation(user_id, msg.animation.file_id, caption=msg.caption)
-            bot.send_message(ADMIN_ID, "✅ 回复已发送给用户")
+            bot.send_message(ADMIN_ID, "✅ 已回复用户")
         except Exception as e:
             bot.send_message(ADMIN_ID, f"❌ 发送失败：{str(e)}")
         return
 
     all_users.add(msg.from_user.id)
-
     if msg.from_user.id in banned_users:
         return
 
     try:
         forward_msg = bot.forward_message(ADMIN_ID, msg.chat.id, msg.message_id)
         forward_map[forward_msg.message_id] = msg.from_user.id
-    except Exception as e:
-        print(f"转发失败：{str(e)}")
+    except:
+        pass
 
-# ========== 核心：强制启动机器人，绕开启动命令问题 ==========
 def start_bot():
     print("✅ 机器人启动成功，等待消息...")
     while True:
         try:
-            bot.infinity_polling(
-                timeout=20,
-                long_polling_timeout=20,
-                skip_pending=True,
-                none_stop=True,
-                interval=1
-            )
+            bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True, none_stop=True, interval=1)
         except Exception as e:
-            print(f"⚠️ 机器人异常重启: {str(e)}")
+            print(f"⚠️ 异常重启: {str(e)}")
             time.sleep(5)
 
-# Flask启动时，自动启动机器人线程
-@app.before_first_request
-def before_first_request():
-    Thread(target=start_bot, daemon=True).start()
-
-# ========== 启动入口（兼容所有启动方式） ==========
 if __name__ == "__main__":
-    # 直接运行时，同时启动Flask和机器人
     Thread(target=run_web_server, daemon=True).start()
     start_bot()
-else:
-    # gunicorn运行时，Flask启动后自动启动机器人
-    pass
