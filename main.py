@@ -29,11 +29,12 @@ def run_web_server():
     port = int(os.getenv("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)
 
-# ========== 机器人核心功能（完全保留你原来的逻辑，修复所有语法/缩进） ==========
+# ========== 机器人核心功能（仅修改/start话术） ==========
 @bot.message_handler(commands=['start'])
 def start(msg: Message):
     all_users.add(msg.from_user.id)
-    bot.send_message(msg.chat.id, "✅ 您好！我是客服机器人，有问题请留言，我们会尽快回复您~")
+    # 已修改为你要求的新话术
+    bot.send_message(msg.chat.id, "笔画双向机器人 看见消息会回复")
 
 @bot.message_handler(commands=['ban'])
 def ban_user(msg: Message):
@@ -141,7 +142,7 @@ def handle_all(msg: Message):
     except Exception as e:
         print(f"转发失败：{str(e)}")
 
-# ========== 启动入口（异常自动重启，稳定运行） ==========
+# ========== 核心：强制启动机器人，绕开启动命令问题 ==========
 def start_bot():
     print("✅ 机器人启动成功，等待消息...")
     while True:
@@ -157,8 +158,16 @@ def start_bot():
             print(f"⚠️ 机器人异常重启: {str(e)}")
             time.sleep(5)
 
+# Flask启动时，自动启动机器人线程
+@app.before_first_request
+def before_first_request():
+    Thread(target=start_bot, daemon=True).start()
+
+# ========== 启动入口（兼容所有启动方式） ==========
 if __name__ == "__main__":
-    # 启动Flask保活服务（后台运行）
+    # 直接运行时，同时启动Flask和机器人
     Thread(target=run_web_server, daemon=True).start()
-    # 启动机器人
     start_bot()
+else:
+    # gunicorn运行时，Flask启动后自动启动机器人
+    pass
