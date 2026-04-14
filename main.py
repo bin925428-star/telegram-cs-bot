@@ -29,7 +29,7 @@ def run_web_server():
     port = int(os.getenv("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)
 
-# ========== 机器人核心功能（完全保留你原来的逻辑，修复语法） ==========
+# ========== 机器人核心功能（完全保留你原来的逻辑，修复所有语法/缩进） ==========
 @bot.message_handler(commands=['start'])
 def start(msg: Message):
     all_users.add(msg.from_user.id)
@@ -162,46 +162,3 @@ if __name__ == "__main__":
     Thread(target=run_web_server, daemon=True).start()
     # 启动机器人
     start_bot()
-            elif msg.video:
-                bot.send_video(user_id, msg.video.file_id, caption=msg.caption)
-            elif msg.document:
-                bot.send_document(user_id, msg.document.file_id, caption=msg.caption)
-            elif msg.sticker:
-                bot.send_sticker(user_id, msg.sticker.file_id)
-            elif msg.voice:
-                bot.send_voice(user_id, msg.voice.file_id, caption=msg.caption)
-            elif msg.video_note:
-                bot.send_video_note(user_id, msg.video_note.file_id)
-            elif msg.audio:
-                bot.send_audio(user_id, msg.audio.file_id, caption=msg.caption)
-            elif msg.animation:
-                bot.send_animation(user_id, msg.animation.file_id, caption=msg.caption)
-            bot.send_message(ADMIN_ID, "✅ 回复已发送给用户")
-        except Exception as e:
-            bot.send_message(ADMIN_ID, f"❌ 发送失败：{str(e)}")
-        return
-
-    all_users.add(msg.from_user.id)
-
-    if msg.from_user.id in banned_users:
-        return
-
-    try:
-        forward_msg = bot.forward_message(ADMIN_ID, msg.chat.id, msg.message_id)
-        forward_map[forward_msg.message_id] = msg.from_user.id
-    except Exception as e:
-        print(f"转发失败：{str(e)}")
-
-# ========== 启动入口（异常自动重启，更稳定） ==========
-def start_bot():
-    print("✅ 机器人启动成功，等待消息...")
-    while True:
-        try:
-            bot.infinity_polling(
-                timeout=20,
-                long_polling_timeout=20,
-                skip_pending=True,
-                none_stop=True,
-                interval=1
-            )
-        except Exception a
